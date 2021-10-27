@@ -22,6 +22,7 @@ LIB_SRCS = \
 	vl53lx_api.c \
 	vl53lx_api_calibration.c \
 	vl53lx_api_core.c \
+	vl53lx_api_debug.c \
 	vl53lx_api_preset_modes.c \
 	vl53lx_core.c \
 	vl53lx_core_support.c \
@@ -32,19 +33,22 @@ LIB_SRCS = \
 	vl53lx_hist_core.c \
 	vl53lx_hist_funcs.c \
 	vl53lx_nvm.c \
+	vl53lx_nvm_debug.c \
 	vl53lx_register_funcs.c \
 	vl53lx_sigma_estimate.c \
 	vl53lx_silicon_core.c \
 	vl53lx_wait.c \
 	vl53lx_xtalk.c \
-	vl53lx_platform.c
+  \
+  vl53lx_platform.c \
+  vl53lx_platform_ipp.c
 
 LIB_OBJS  = $(LIB_SRCS:%.c=$(OBJ_DIR)/%.o)
 
 EXAMPLES_SRC = \
-  example/Src/main.c
+  example/main.c
 
-EXAMPLES_BIN = $(EXAMPLES_SRC:example/Src/%.c=$(OUTPUT_DIR)/%)
+EXAMPLES_BIN = $(EXAMPLES_SRC:example/%.c=$(OUTPUT_DIR)/%)
 
 
 .PHONY: all
@@ -58,7 +62,7 @@ $(OBJ_DIR)/%.o:%.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@
 
-$(EXAMPLES_BIN): bin/%:example/Src/%.c
+$(EXAMPLES_BIN): bin/%:example/%.c
 	mkdir -p $(dir $@)
 	$(CC) -L$(OUTPUT_DIR) $^ -lVL53L3CX_rasppi  $(INCLUDES) -o $@
 

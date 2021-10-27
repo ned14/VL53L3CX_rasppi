@@ -25,29 +25,40 @@ extern "C"
 {
 #endif
 
+  int VL53LX_i2c_init(char* devPath, int devAddr);
+  int32_t VL53LX_i2c_close(void);
+
+  /**
+   * @file vl53l0x_platform.h
+   *
+   * @brief All end user OS/platform/application porting
+   */
+
+   /**
+    * @defgroup VL53LX_platform_group VL53LX Platform Functions
+    * @brief    VL53LX Platform Functions
+    *  @{
+    */
+
+    /**
+     * @struct  VL53LX_Dev_t
+     * @brief    Generic PAL device type that does link between API and platform abstraction layer
+     *
+     */
+  typedef struct {
+    VL53LX_DevData_t Data;               /*!< embed ST Ewok Dev  data as "Data"*/
+
+    /*!< user specific field */
+    uint8_t   I2cDevAddr;                /*!< i2c device address user specific field */
+    int   fd;
+  } VL53LX_Dev_t;
 
 
-
-
-typedef struct {
-
-	VL53LX_DevData_t   Data;
-
-
-	uint8_t   i2c_slave_address;
-
-	uint8_t   comms_type;
-
-	uint16_t  comms_speed_khz;
-
-
-	uint32_t  new_data_ready_poll_duration_ms;
-
-} VL53LX_Dev_t;
-
-
-
-typedef VL53LX_Dev_t *VL53LX_DEV;
+  /**
+   * @brief   Declare the device Handle as a pointer of the structure @a VL53LX_Dev_t.
+   *
+   */
+  typedef VL53LX_Dev_t* VL53LX_DEV;
 
 
 

@@ -18,8 +18,7 @@ extern "C"
 {
 #endif
 
-
-
+#define _LOG_TRACE_PRINT(...)
 
 
 #define do_division_u(dividend, divisor) (dividend / divisor)
