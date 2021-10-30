@@ -31,9 +31,13 @@
 ******************************************************************************
 */
 /* Includes ------------------------------------------------------------------*/
+#include <fcntl.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
+
+#define XSHUTPIN 4  // GPIO 4
 
 /* USER CODE BEGIN Includes */
 #include "vl53lx_api.h"
@@ -45,8 +49,6 @@
 VL53LX_Dev_t                   dev;
 VL53LX_DEV                     Dev = &dev;
 int status;
-volatile int IntCount;
-#define isInterrupt 1 /* If isInterrupt = 1 then device working in hardware interrupt mode, else device working in polling mode */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,13 +60,48 @@ void RangingLoop(void); /*  */
 int main(void)
 {
   /* USER CODE BEGIN 2 */
+
+#if 0  // not necessary if you don't connect XSHUT
+  printf("Raising XSHUT pin %d to enable sensor...\n", XSHUTPIN);
+  char buffer[64];
+  sprintf(buffer, "/sys/class/gpio/gpio%d/direction", XSHUTPIN);
+  int fd = open(buffer, O_RDWR);
+  if (fd < 0) {
+    int fd = open("/sys/class/gpio/export", O_RDWR);
+    if (fd < 0) {
+      printf ("Failed to init 1\n");
+      return 1;
+    }
+    sprintf(buffer, "%d", XSHUTPIN);
+    write(fd, buffer, strlen(buffer));
+    close(fd);
+    usleep(1000);
+  }
+  sprintf(buffer, "/sys/class/gpio/gpio%d/direction", XSHUTPIN);
+  fd = open(buffer, O_RDWR);
+  if (fd < 0) {
+      printf ("Failed to init 2 due to %s\n", strerror(errno));
+      return 1;
+  }
+  write(fd, "out", 3);
+  close(fd);
+  sprintf(buffer, "/sys/class/gpio/gpio%d/value", XSHUTPIN);
+  fd = open(buffer, O_RDWR);
+  if (fd < 0) {
+      printf ("Failed to init 3\n");
+      return 1;
+  }
+  write(fd, "1", 1);
+  close(fd);
+  usleep(250000);
+#endif
   
   printf("VL53L1X Examples...\n");
 
-  Dev->I2cDevAddr = 0x52;
+  Dev->I2cDevAddr = 0x29;
   Dev->fd = VL53LX_i2c_init("/dev/i2c-1", Dev->I2cDevAddr); //choose between i2c-0 and i2c-1; On the raspberry pi zero, i2c-1 are pins 2 and 3
   if (Dev->fd<0) {
-      printf ("Failed to init\n");
+      printf ("Failed to init 4\n");
       return 1;
   }
   
@@ -72,8 +109,14 @@ int main(void)
   uint16_t wordData;
   VL53LX_RdByte(Dev, 0x010F, &byteData);
   printf("VL53LX Model_ID: %02X\n\r", byteData);
+  if(byteData != 0xea) {
+    printf("WARNING: Model Id is not 0xea, which it ought to be!\n");
+  }
   VL53LX_RdByte(Dev, 0x0110, &byteData);
   printf("VL53LX Module_Type: %02X\n\r", byteData);
+  if(byteData != 0xaa) {
+    printf("WARNING: Module type is not 0xaa, which it ought to be!\n");
+  }
   VL53LX_RdWord(Dev, 0x010F, &wordData);
   printf("VL53LX: %02X\n\r", wordData);
   RangingLoop();
@@ -115,7 +158,7 @@ void RangingLoop(void)
   
   do{ // polling mode
     status = VL53LX_GetMeasurementDataReady(Dev, &NewDataReady);                        
-    usleep(1000); // 1 ms polling period, could be longer.
+    usleep(250000); // 250 millisecond polling period, could be 1 millisecond.
     if((!status)&&(NewDataReady!=0)){
       status = VL53LX_GetMultiRangingData(Dev, pMultiRangingData);
       no_of_object_found=pMultiRangingData->NumberOfObjectsFound;
@@ -123,7 +166,7 @@ void RangingLoop(void)
       printf("#Objs=%1d ", no_of_object_found);
       for(j=0;j<no_of_object_found;j++){
         if(j!=0)printf("\n                     ");
-        printf("status=%d, D=%5dmm, S=%5dmm, Signal=%2.2f Mcps, Ambient=%2.2f Mcps",
+        printf("status=%d, D=%5dmm, S=%7dmm, Signal=%2.2f Mcps, Ambient=%2.2f Mcps",
                pMultiRangingData->RangeData[j].RangeStatus,
                pMultiRangingData->RangeData[j].RangeMilliMeter,
                pMultiRangingData->RangeData[j].SigmaMilliMeter,

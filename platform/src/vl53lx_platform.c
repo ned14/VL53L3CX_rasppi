@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <time.h>
 #include <linux/i2c-dev.h>
 #include <unistd.h>
+#include <sys/uio.h>
 #include "vl53lx_platform.h"
 #include "vl53lx_api.h"
 
@@ -37,28 +39,43 @@ int32_t VL53LX_i2c_close(void)
 
 static int i2c_write(int fd, uint16_t cmd, uint8_t * data, uint8_t len){
 
-    uint8_t * buf = malloc(len+2);
-    buf[0] = cmd & 0xff;
-    buf[1] = cmd >> 8;
-    memcpy(buf+2, data, len);
-    if (write(fd, buf, len+2) != len+2) {
-        printf("Failed to write to the i2c bus.\n");
+#if 0
+    // Looks like i2c-dev doesn't support writev
+    struct iovec vec[2];
+    uint8_t buf[2] = { cmd >> 8, cmd & 0xff };
+    vec[0].iov_base = buf;
+    vec[0].iov_len = 2;
+    vec[1].iov_base = data;
+    vec[2].iov_len = len;
+    if (writev(fd, vec, 2) != len+2) {
+        printf("Failed to write to the i2c bus due to %s.\n", strerror(errno));
+        return VL53LX_ERROR_CONTROL_INTERFACE;
+    }
+#else
+    uint8_t *buf = malloc(len + 2);
+    buf[0] = cmd >> 8;
+    buf[1] = cmd & 0xff;
+    memcpy(buf + 2, data, len);
+    if (write(fd, buf, len + 2) != len+2) {
         free(buf);
+        printf("Failed to write to the i2c bus due to %s.\n", strerror(errno));
         return VL53LX_ERROR_CONTROL_INTERFACE;
     }
     free(buf);
+#endif
     return VL53LX_ERROR_NONE;
 }
 
 static int i2c_read(int fd, uint16_t cmd, uint8_t * data, uint8_t len){
 
-    if (write(fd, &cmd, 2) != 2) {
-        printf("Failed to write to the i2c bus.\n");
+    uint8_t buf[2] = { cmd >> 8, cmd & 0xff };
+    if (write(fd, buf, 2) != 2) {
+        printf("Failed to write to the i2c bus due to %s.\n", strerror(errno));
         return VL53LX_ERROR_CONTROL_INTERFACE;
     }
 
     if (read(fd, data, len) != len) {
-        printf("Failed to read from the i2c bus.\n");
+        printf("Failed to read from the i2c bus due to %s.\n", strerror(errno));
         return VL53LX_ERROR_CONTROL_INTERFACE;
     }
 
@@ -191,6 +208,7 @@ VL53LX_Error VL53LX_WaitValueMaskEx(
   VL53LX_Error status = VL53LX_ERROR_NONE;
   uint32_t     start_time_ms = 0;
   uint32_t     current_time_ms = 0;
+  uint32_t     polling_time_ms = 0;
   uint8_t      byte_value = 0;
   uint8_t      found = 0;
 #ifdef VL53LX_LOG_ENABLE
@@ -227,7 +245,7 @@ VL53LX_Error VL53LX_WaitValueMaskEx(
 
 
   while ((status == VL53LX_ERROR_NONE) &&
-    /*(pdev->new_data_ready_poll_duration_ms < timeout_ms) &&*/
+    (polling_time_ms < timeout_ms) &&
     (found == 0))
   {
     status = VL53LX_RdByte(
@@ -244,7 +262,7 @@ VL53LX_Error VL53LX_WaitValueMaskEx(
 
 
     VL53LX_GetTickCount(pdev, &current_time_ms);
-    // pdev->new_data_ready_poll_duration_ms = current_time_ms - start_time_ms;
+    polling_time_ms = current_time_ms - start_time_ms;
   }
 
 
